@@ -1,0 +1,6 @@
+TTS/
+models/gpt-2/
+stt_models/faster-whisper/
+venv/
+faiss_index/
+db.sqlite3
