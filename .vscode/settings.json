@@ -1,0 +1,5 @@
+{
+    "python.analysis.extraPaths": [
+        "./stt_models/faster-whisper"
+    ]
+}
