@@ -1,11 +1,20 @@
+
 import os
-from django.core.files.storage import FileSystemStorage
 import uuid # For generating unique filenames
 import time # Import the time module for sleep
 import io # Added for gTTS
 import json # Added for RAG/LLM (though primarily used in views, good to have if any JSON ops happen here)
 import base64 # Added for RAG/LLM (though primarily used in views, good to have if any base64 ops happen here)
 import requests # Added for downloading audio
+import os
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from webdriver_manager.chrome import ChromeDriverManager
 
 # Langchain imports for PDF processing
 from langchain_community.document_loaders import PyPDFLoader
@@ -19,15 +28,7 @@ from faster_whisper import WhisperModel
 # pyttsx3 import for TTS
 import pyttsx3
 
-# Selenium imports for WebDriver
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.by import By
-from selenium.common.exceptions import StaleElementReferenceException, NoSuchElementException
+
 
 # Transformers imports for GPT2
 from transformers import GPT2LMHeadModel, GPT2Tokenizer
@@ -56,10 +57,10 @@ print(f"FAISS_INDEX_DIR ensured: {FAISS_INDEX_DIR}")
 try:
     # Using stt_model_dir as the model path as requested by the user
     stt_model = WhisperModel("base", device="cpu", compute_type="int8")
-    print(f"Faster Whisper model loaded successfully from ") # Escape curly braces
+    print(f"Faster Whisper model loaded successfully (model: base)")
 except Exception as e:
     stt_model = None
-    print(f"Error loading Faster Whisper model from ")
+    print(f"Error loading Faster Whisper model (model: base): {e}")
 
 # Initialize pyttsx3 engine globally
 try:
@@ -117,9 +118,14 @@ def handle_uploaded_pdf(uploaded_file):
         os.makedirs(pdf_docs_dir)
         print(f"Created directory: {pdf_docs_dir}") # Escape curly braces
 
-    fs = FileSystemStorage(location=pdf_docs_dir)
-    filename = fs.save(uploaded_file.name, uploaded_file)
-    file_path = os.path.join(pdf_docs_dir, filename)
+    # fs = FileSystemStorage(location=pdf_docs_dir) # Removed this line since FileSystemStorage is not imported.
+    # filename = fs.save(uploaded_file.name, uploaded_file) # Adjusted to directly write the file.
+
+    file_path = os.path.join(pdf_docs_dir, uploaded_file.name)
+    with open(file_path, 'wb+') as destination:
+        for chunk in uploaded_file.chunks():
+            destination.write(chunk)
+
     print(f"Saved PDF file to: {file_path}") # Escape curly braces
     return file_path
 
@@ -159,32 +165,69 @@ def process_pdf_to_vectorstore(pdf_path, embeddings_model, chunk_size=1000, chun
         print("No texts to process from PDF.")
         return None
 
-def initialize_webdriver():
-    """Initializes and configures the Selenium WebDriver for headless Chrome."""
+
+
+
+def initialize_webdriver(headless=False):
+    """
+    Initializes Selenium WebDriver for WhatsApp Web.
+    Handles both logged-in and not logged-in sessions safely.
+    Returns:
+        driver: Selenium WebDriver instance
+        logged_in: True if already logged in, False if QR scan needed, None if unknown
+    """
     print("Initializing Selenium WebDriver...")
+
     options = Options()
-    options.add_argument("--headless=new")  # Run in headless mode (preferred for newer Chrome)
+    if headless:
+        options.add_argument("--headless=new")  # Headless only if needed
+    options.add_argument("--start-maximized")
+    options.add_argument("--disable-infobars")
+    options.add_argument("--disable-extensions")
+    options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--window-size=1920,1080")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--remote-debugging-port=9222") # For potential debugging
+    options.add_argument("--remote-debugging-port=9222")
 
-    # Create a user data directory for persistent sessions
+    # Persistent session
     user_data_dir = './user_data/chrome'
-    if not os.path.exists(user_data_dir):
-        os.makedirs(user_data_dir, exist_ok=True)
-        print(f"Created Chrome user data directory: {user_data_dir}")
+    os.makedirs(user_data_dir, exist_ok=True)
     options.add_argument(f"user-data-dir={user_data_dir}")
+    print(f"Using Chrome user data directory: {user_data_dir}")
 
-    # Install and get the path to the ChromeDriver executable
+    # Install ChromeDriver
     driver_path = ChromeDriverManager().install()
-    service = Service(executable_path=driver_path)
+    service = Service(driver_path)
 
     driver = webdriver.Chrome(service=service, options=options)
     driver.set_page_load_timeout(60)
-    print("Selenium WebDriver initialized successfully.")
-    return driver
+
+    # Open WhatsApp Web
+    driver.get("https://web.whatsapp.com/")
+    print("Navigated to WhatsApp Web.")
+
+    try:
+        wait = WebDriverWait(driver, 20)  # Wait up to 20 seconds
+        qr_canvas = wait.until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "canvas[aria-label='Scan me!']"))
+        )
+        print("❌ Not logged in. Please scan the QR code from your phone.")
+        logged_in = False
+    except TimeoutException:
+        # QR code not found → probably already logged in
+        print("✅ WhatsApp Web already logged in.")
+        logged_in = True
+    except Exception as e:
+        print(f"⚠️ Unexpected error while checking QR code: {e}")
+        logged_in = None
+
+    print("Selenium WebDriver ready.")
+    return driver, logged_in
+
+# Example usage:
+# driver, logged_in = initialize_webdriver(headless=False)
+# if logged_in is False:
+#     print("Scan the QR code manually from your phone.")
 
 def download_whatsapp_audio(audio_element, driver, temp_dir='./temp_audio_downloads'):
     """Downloads the audio associated with a WhatsApp audio message element."""
@@ -313,6 +356,30 @@ Answer only from the context:
         print(f"Error during GPT-2 inference in get_rag_llm_response: {e}")
         return f"Error generating response: {e}"
 
+def open_whatsapp_web_and_wait_for_login(driver):
+    """Navigates to WhatsApp Web and waits for the user to scan the QR code and log in."""
+    print("Navigating to WhatsApp Web...")
+    driver.get("https://web.whatsapp.com/")
+
+    print("Waiting for QR code to appear...")
+    try:
+        # Wait for the QR code element to be present (adjust selector if needed)
+        WebDriverWait(driver, 60).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "div[data-ref*='qr']"))
+        )
+        print("QR code detected. Please scan the QR code from your phone to log in.")
+
+        # Wait until the user is logged in (e.g., by checking for elements that appear after successful login)
+        # A common element after login is the chat list or the search bar.
+        WebDriverWait(driver, 180).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "div[data-testid='chat-list']")) or \
+            EC.presence_of_element_located((By.CSS_SELECTOR, "div[title='Search input mobile']"))
+        )
+        print("Successfully logged into WhatsApp Web.")
+        return True
+    except Exception as e:
+        print(f"Error during WhatsApp Web login: {e}")
+        return False
 
 def monitor_whatsapp_messages(driver):
     """Continuously monitors for new incoming WhatsApp messages and extracts their content."""
@@ -322,10 +389,9 @@ def monitor_whatsapp_messages(driver):
     while True:
         try:
             print("[WhatsApp Monitor] Checking for new messages...")
-            # Find all message elements. The selector might need adjustment based on WhatsApp Web's latest structure.
-            # A more robust selector for message bubbles that typically contain data-id
-            messages = driver.find_elements(By.CSS_SELECTOR, "div[data-id][data-testid^='message-stub-']") # Targeting elements with data-id and a specific testid pattern
-            print(f"[WhatsApp Monitor] Found {len(messages)} message elements.")
+            # Find all message elements. A more robust selector to catch all message bubbles.
+            messages = driver.find_elements(By.CSS_SELECTOR, "div[data-id]") # Targeting any element with data-id
+            print(f"[WhatsApp Monitor] Found {len(messages)} message elements with data-id.")
 
             # Process new messages, iterating in reverse to get newest first
             for msg_element in reversed(messages):
@@ -355,8 +421,8 @@ def monitor_whatsapp_messages(driver):
 
                     # Extract text content
                     try:
-                        # Adjust selector for text content within a message element
-                        text_span = msg_element.find_element(By.CSS_SELECTOR, "span.selectable-text, div[data-pre-plain-text], div.copyable-text span")
+                        # Adjust selector for text content within a message element. Broader approach.
+                        text_span = msg_element.find_element(By.CSS_SELECTOR, "span.selectable-text, div[data-pre-plain-text], div[class*='message-text'] span")
                         message_text = text_span.text
                         message_type = "TEXT"
                         print(f"[WhatsApp Monitor] Detected TEXT message with content: {message_text[:50]}...")
@@ -367,8 +433,8 @@ def monitor_whatsapp_messages(driver):
                     # Determine if it's an audio message
                     audio_element = None
                     try:
-                        # Adjust selector for audio element within a message element
-                        audio_element = msg_element.find_element(By.CSS_SELECTOR, "div[data-testid='audio-play-button'], div[data-testid='audio-download'], div[role='button'][aria-label='Play']") # Updated selector for audio detection
+                        # Adjust selector for audio element within a message element. Broader approach.
+                        audio_element = msg_element.find_element(By.CSS_SELECTOR, "div[data-testid='audio-play-button'], div[data-testid='audio-download'], div[role='button'][aria-label='Play'], audio")
                         if audio_element: # If audio element is found
                             message_type = "AUDIO"
                             message_text = "(Audio Message - processing)"
@@ -404,7 +470,7 @@ def monitor_whatsapp_messages(driver):
                             # Locate the message input field (chatbox)
                             # Common selectors for chat input field (adjust if WhatsApp Web updates)
                             input_field = WebDriverWait(driver, 10).until(
-                                EC.presence_of_element_located((By.CSS_SELECTOR, "div[contenteditable='true'][data-tab='10']"))
+                                EC.presence_of_element_located((By.CSS_SELECTOR, "div[contenteditable='true'][data-tab='10'], div[data-testid='pluggable-input-compose']"))
                             )
                             input_field.send_keys(ai_response_text)
                             print(f"[WhatsApp Monitor] Typed AI response into chat: {ai_response_text[:50]}...")
@@ -412,7 +478,7 @@ def monitor_whatsapp_messages(driver):
                             # Locate and click the send button
                             # Common selectors for send button (adjust if WhatsApp Web updates)
                             send_button = WebDriverWait(driver, 10).until(
-                                EC.element_to_be_clickable((By.CSS_SELECTOR, "span[data-testid='send']"))
+                                EC.element_to_be_clickable((By.CSS_SELECTOR, "span[data-testid='send'], button[aria-label='Send']"))
                             )
                             send_button.click()
                             print("[WhatsApp Monitor] Clicked send button.")
@@ -422,11 +488,11 @@ def monitor_whatsapp_messages(driver):
                             # Re-find elements and try again (basic retry, more robust solutions might involve loops)
                             try:
                                 input_field = WebDriverWait(driver, 10).until(
-                                    EC.presence_of_element_located((By.CSS_SELECTOR, "div[contenteditable='true'][data-tab='10']"))
+                                    EC.presence_of_element_located((By.CSS_SELECTOR, "div[contenteditable='true'][data-tab='10'], div[data-testid='pluggable-input-compose']"))
                                 )
                                 input_field.send_keys(ai_response_text)
                                 send_button = WebDriverWait(driver, 10).until(
-                                    EC.element_to_be_clickable((By.CSS_SELECTOR, "span[data-testid='send']"))
+                                    EC.element_to_be_clickable((By.CSS_SELECTOR, "span[data-testid='send'], button[aria-label='Send']"))
                                 )
                                 send_button.click()
                                 print("[WhatsApp Monitor] Retried: Typed AI response and clicked send button.")

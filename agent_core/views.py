@@ -6,19 +6,29 @@ import json
 import base64
 from gtts import gTTS
 
+# Import for displaying QR code directly in Colab output
+from IPython.display import Image, display
+
 # Selenium imports
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 import tempfile
 import threading # Import threading
-
 # Import all necessary components from .utils
 from .utils import (
     stt_model, speech_to_text, text_to_speech, handle_uploaded_pdf,
     process_pdf_to_vectorstore, initialize_webdriver, monitor_whatsapp_messages,
     tokenizer, model, embeddings, FAISS_INDEX_DIR, get_rag_llm_response
 )
+
+# The functions and global variables are defined in the previously executed cell (6IIuLd9DcqUf)
+# and are therefore globally available. The relative import is not needed here.
+# from .utils import (
+#     stt_model, speech_to_text, text_to_speech, handle_uploaded_pdf,
+#     process_pdf_to_vectorstore, initialize_webdriver, monitor_whatsapp_messages,
+#     tokenizer, model, embeddings, FAISS_INDEX_DIR, get_rag_llm_response
+# )
 
 # Global variable for Selenium WebDriver
 whatsapp_driver = None
@@ -163,33 +173,23 @@ def whatsapp_session_view(request):
 
                 if whatsapp_driver is None:
                     print("Creating NEW Chrome session...")
-                    whatsapp_driver = initialize_webdriver()
+                    # Unpack the tuple returned by initialize_webdriver
+                    new_driver, logged_in_status = initialize_webdriver()
+                    whatsapp_driver = new_driver # Assign the driver to the global variable
                     print("Selenium WebDriver initialized.")
 
-                whatsapp_driver.get('https://web.whatsapp.com/')
-                wait = WebDriverWait(whatsapp_driver, 60)
-
-                try:
-                    wait.until(EC.presence_of_element_located((By.ID, "pane-side")))
-                    print("✅ WhatsApp already logged in")
-                    return JsonResponse({"status": "success", "message": "WhatsApp already logged in"})
-                except:
-                    print("❌ Not logged in, waiting for QR code...")
-                    try:
-                        qr_element = wait.until(EC.presence_of_element_located((By.XPATH, "//canvas")))
-                        print("✅ QR code found")
-
-                        # Save QR temporarily and encode
-                        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp_file:
-                            temp_path = tmp_file.name
-                        qr_element.screenshot(temp_path)
-                        with open(temp_path, 'rb') as img:
-                            encoded = base64.b64encode(img.read()).decode('utf-8')
-                        os.remove(temp_path)
-
-                        return JsonResponse({"status": "success", "message": "Scan QR code", "qr_code_image": f"data:image/png;base64,{encoded}"})
-                    except Exception as e:
-                        return JsonResponse({"status": "error", "message": str(e)}, status=500)
+                    if logged_in_status is False:
+                        # QR code needed
+                        return JsonResponse({"status": "qr_required", "message": "WhatsApp Web opened. Please scan the QR code from your phone to log in."})
+                    elif logged_in_status is True:
+                        # Already logged in
+                        return JsonResponse({"status": "success", "message": "WhatsApp already logged in."})
+                    else:
+                        # Unknown status (error during init_webdriver)
+                        return JsonResponse({"status": "error", "message": "Could not determine login status during WebDriver initialization."}, status=500)
+                else:
+                    # If whatsapp_driver is already active and alive from a previous call
+                    return JsonResponse({"status": "success", "message": "WhatsApp session already active."})
 
             # =========================
             # 🦾 MONITOR MESSAGES

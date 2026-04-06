@@ -1,30 +1,15 @@
-2026/03/31-07:18:28.228 4100 Reusing MANIFEST /home/pc/Documents/ai_agent_project/user_data/chrome/Default/Local Storage/leveldb/MANIFEST-000001
-2026/03/31-07:18:28.261 4100 Recovering log #4
-2026/03/31-07:18:28.266 4100 Reusing old log /home/pc/Documents/ai_agent_project/user_data/chrome/Default/Local Storage/leveldb/000004.log 
-2026/03/31-07:30:30.196 4100 Level-0 table #8: started
-2026/03/31-07:30:30.203 4100 Level-0 table #8: 21076 bytes OK
-2026/03/31-07:30:30.211 4100 Delete type=0 #4
-2026/03/31-07:59:06.970 4102 Level-0 table #10: started
-2026/03/31-07:59:06.977 4102 Level-0 table #10: 20808 bytes OK
-2026/03/31-07:59:06.986 4102 Delete type=0 #7
-2026/03/31-11:09:59.322 4102 Level-0 table #12: started
-2026/03/31-11:09:59.329 4102 Level-0 table #12: 15607 bytes OK
-2026/03/31-11:09:59.338 4102 Delete type=0 #9
-2026/03/31-11:41:38.700 4102 Level-0 table #14: started
-2026/03/31-11:41:38.707 4102 Level-0 table #14: 14828 bytes OK
-2026/03/31-11:41:38.717 4102 Delete type=0 #11
-2026/03/31-12:31:01.565 4100 Level-0 table #16: started
-2026/03/31-12:31:01.571 4100 Level-0 table #16: 15758 bytes OK
-2026/03/31-12:31:01.580 4100 Delete type=0 #13
-2026/03/31-12:31:01.581 4100 Compacting 4@0 + 1@1 files
-2026/03/31-12:31:01.589 4100 Generated table #17@0: 222 keys, 15940 bytes
-2026/03/31-12:31:01.590 4100 Compacted 4@0 + 1@1 files => 15940 bytes
-2026/03/31-12:31:01.595 4100 compacted to: files[ 0 1 1 0 0 0 0 ]
-2026/03/31-12:31:01.597 4100 Delete type=2 #14
-2026/03/31-12:31:01.597 4100 Delete type=2 #8
-2026/03/31-12:31:01.597 4100 Delete type=2 #16
-2026/03/31-12:31:01.597 4100 Delete type=2 #12
-2026/03/31-12:31:01.597 4100 Delete type=2 #10
-2026/03/31-12:55:49.722 4102 Level-0 table #19: started
-2026/03/31-12:55:49.730 4102 Level-0 table #19: 15142 bytes OK
-2026/03/31-12:55:49.739 4102 Delete type=0 #15
+2026/04/06-07:31:04.880 b790 Reusing MANIFEST /home/pc/Documents/ai_agent_project/user_data/chrome/Default/Local Storage/leveldb/MANIFEST-000001
+2026/04/06-07:31:04.900 b790 Recovering log #24
+2026/04/06-07:31:04.903 b790 Reusing old log /home/pc/Documents/ai_agent_project/user_data/chrome/Default/Local Storage/leveldb/000024.log 
+2026/04/06-07:51:37.793 b792 Level-0 table #28: started
+2026/04/06-07:51:37.800 b792 Level-0 table #28: 20755 bytes OK
+2026/04/06-07:51:37.808 b792 Delete type=0 #24
+2026/04/06-07:51:37.809 b792 Compacting 4@0 + 1@1 files
+2026/04/06-07:51:37.817 b792 Generated table #29@0: 342 keys, 20805 bytes
+2026/04/06-07:51:37.817 b792 Compacted 4@0 + 1@1 files => 20805 bytes
+2026/04/06-07:51:37.822 b792 compacted to: files[ 0 1 1 0 0 0 0 ]
+2026/04/06-07:51:37.825 b792 Delete type=2 #25
+2026/04/06-07:51:37.825 b792 Delete type=2 #28
+2026/04/06-07:51:37.825 b792 Delete type=2 #17
+2026/04/06-07:51:37.825 b792 Delete type=2 #19
+2026/04/06-07:51:37.825 b792 Delete type=2 #22
